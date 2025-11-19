@@ -1,7 +1,7 @@
 (*
-  DTonn - Delphi Toon unit
+  DTonn - Delphi Support Lib for Toon (Token-Oriented Object Notation)
 
-  Base on: https://toonformat.dev/guide/format-overview 
+  Based on: https://toonformat.dev/guide/format-overview 
 
   TOON models data the same way as JSON:
     - Primitives: strings, numbers, booleans, and null
@@ -21,7 +21,7 @@ Author: Magno Lima
 Version: 1.0
 Compatible: Delphi 12+
 
-License: MIT License (see LICENSE file)
+License: Apache License (see LICENSE file)
 *)
 unit DToon;
 
