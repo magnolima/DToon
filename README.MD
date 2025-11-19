@@ -126,3 +126,10 @@ end;
 
 ## Requirements
 
+- Delphi (any modern version with:
+  - System.SysUtils
+  - System.Classes
+  - System.Generics.Collections
+  - System.RegularExpressions
+  - System.StrUtils
+- No external dependencies beyond the RTL.
