@@ -1,4 +1,4 @@
-# DToon – Delphi TOON Unit
+# DToon - Delphi Support Lib for Toon (Token-Oriented Object Notation) 
 
 `DToon` is a small Delphi unit that parses [TOON](https://toonformat.dev/guide/format-overview) documents into an in-memory tree structure.
 
