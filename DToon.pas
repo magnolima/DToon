@@ -38,7 +38,8 @@ uses
   System.Classes, 
   System.Generics.Collections, 
   System.RegularExpressions,
-  System.StrUtils;
+  System.StrUtils,
+  System.Rtti;
 
 type
   TToonNodeType = (tntObject, tntArray, tntString, tntNumber, tntBoolean, tntNull);
