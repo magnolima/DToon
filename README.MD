@@ -133,3 +133,7 @@ end;
   - System.RegularExpressions
   - System.StrUtils
 - No external dependencies beyond the RTL.
+
+## License
+This project is licensed under the Apache License 2.0 - see the [Apache License](LICENSE). file for details.
+
