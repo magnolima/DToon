@@ -1,14 +1,20 @@
-(*
-  DTonn - Delphi Support Lib for Toon (Token-Oriented Object Notation)
+(***
 
-  Based on: https://toonformat.dev/guide/format-overview 
+DTonn 1.0 - Delphi Support Lib for Toon (Token-Oriented Object Notation)
 
-  TOON models data the same way as JSON:
+While JSON is the standard for web APIs, it is "token-heavy" 
+due to excessive punctuation (braces, quotes, commas). 
+TOON solves this by using a clean, indentation-based syntax similar to YAML, 
+but with the strict structural model of JSON.
+
+Overview: https://toonformat.dev/guide/format-overview 
+
+TOON models data the same way as JSON:
     - Primitives: strings, numbers, booleans, and null
     - Objects: mappings from string keys to values
     - Arrays: ordered sequences of values
 
-  Root Forms
+Root Forms
   A TOON document can represent different root forms:
     - Root object (most common):
       Fields appear at depth 0 with no parent key
@@ -21,8 +27,8 @@ Author: Magno Lima
 Version: 1.0
 Compatible: Delphi 12+
 
-License: Apache License (see LICENSE file)
-*)
+License: MIT License (see LICENSE file)
+***)
 unit DToon;
 
 interface

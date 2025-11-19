@@ -1,8 +1,18 @@
 # DToon - Delphi Support Lib for Toon (Token-Oriented Object Notation) 
 
-`DToon` is a small Delphi unit that parses [TOON](https://toonformat.dev/guide/format-overview) documents into an in-memory tree structure.
+**DToon** is a lightweight Delphi library for parsing **TOON (Token-Oriented Object Notation)**, a modern data serialization format designed specifically for the AI era.
 
-It is based on the official TOON format overview and models data in a JSON-like way, but with a more human-friendly, indentation-based syntax.
+It is based on the official TOON format overview [TOON](https://toonformat.dev/guide/format-overview) and models data in a JSON-like way, but with a more human-friendly, indentation-based syntax.
+
+### What is TOON?
+While JSON is the standard for web APIs, it is "token-heavy" due to excessive punctuation (braces, quotes, commas). TOON solves this by using a clean, indentation-based syntax similar to YAML, but with the strict structural model of JSON.
+
+**Key Benefits:**
+* **Token Efficiency:** Reduces token usage by removing syntactic noise, saving costs and context window space in LLM interactions.
+* **High Density:** Supports "Table Arrays" (e.g., `users[N]{fields}`), allowing lists of objects to be represented as dense CSV-like rows.
+* **Human Readable:** Easier to read and edit manually than minified JSON.
+
+DToon brings this efficiency to the Delphi ecosystem, allowing you to easily integrate token-optimized data streams into your applications.
 
 ---
 
@@ -135,5 +145,5 @@ end;
 - No external dependencies beyond the RTL.
 
 ## License
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE). file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE). file for details.
 
