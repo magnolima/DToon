@@ -1,180 +1,124 @@
-\# DToon – Delphi TOON Parser
+# DToon – Delphi TOON Unit
 
+`DToon` is a small Delphi unit that parses [TOON](https://toonformat.dev/guide/format-overview) documents into an in-memory tree structure.
 
-
-`DToon` is a small Delphi unit that parses \[TOON](https://toonformat.dev/guide/format-overview) documents into an in-memory tree structure.
-
-
-
-It is intended as a simple, self-contained helper for projects that want a human-friendly, JSON-like configuration or data format in Delphi.
-
-
+It is based on the official TOON format overview and models data in a JSON-like way, but with a more human-friendly, indentation-based syntax.
 
 ---
 
+## TOON Data Model
 
+TOON models data the same way as JSON:
 
-\## TOON Data Model (short version)
+- **Primitives**
+  - strings  
+  - numbers  
+  - booleans  
+  - `null`
 
+- **Objects**
+  - mappings from string keys to values
 
-
-TOON models data in a way that is very close to JSON:
-
-
-
-\- \*\*Primitives\*\*  
-
-&nbsp; - strings  
-
-&nbsp; - numbers  
-
-&nbsp; - booleans  
-
-&nbsp; - `null`
-
-
-
-\- \*\*Objects\*\*  
-
-&nbsp; - mappings from string keys to values
-
-
-
-\- \*\*Arrays\*\*  
-
-&nbsp; - ordered sequences of values
-
-
-
-\### Root Forms
-
-
-
-A TOON document can represent different \*root\* forms:
-
-
-
-\- \*\*Root object\*\* (most common)  
-
-&nbsp; Fields appear at depth `0` with no parent key.
-
-
-
-\- \*\*Root array\*\*  
-
-&nbsp; Begins with:
-
-
-
-&nbsp; - `\[N]:` \*\*or\*\*
-
-&nbsp; - `\[N]{fields}:`
-
-
-
-&nbsp; at depth `0`, where `N` is the array length.
-
-
-
-\- \*\*Root primitive\*\*  
-
-&nbsp; A single primitive value (string, number, boolean, or `null`).
-
-
+- **Arrays**
+  - ordered sequences of values
 
 ---
 
+## Root Forms
 
+A TOON document can represent different root forms:
 
-\## What this unit provides
+- **Root object (most common)**  
+  Fields appear at depth `0` with no parent key.
 
+- **Root array**  
+  Begins with:
 
+  - `[N]:`  
+  - or `[N]{fields}:`  
 
-The `DToon` unit exposes two main types:
+  at depth `0`, where `N` is the array length.
 
+- **Root primitive**  
+  A single primitive value (string, number, boolean, or `null`).
 
+---
 
-\### `TToonNode`
+## Main Types
 
+The unit exposes two core classes:
 
+### `TToonNode`
 
-Represents a node in the parsed TOON tree.
+Represents a node in the TOON tree:
 
+- `NodeType: TToonNodeType` – kind of node:
+  - `tntObject`, `tntArray`, `tntString`, `tntNumber`, `tntBoolean`, `tntNull`
+- `Key: string` – field name (for object children)
+- `Value: string` – raw string value for primitive nodes
+- `Items[Index: Integer]: TToonNode` – indexed access to children
+- `Pair[const KeyName: string]: TToonNode` – access by key (for objects)
+- `Count: Integer` – number of children
 
+Helper methods:
+
+- `AddChild(AType: TToonNodeType; AKey: string = ''): TToonNode`
+- `AsString: string`
+- `AsInteger: Integer`
+- `AsBoolean: Boolean`
+- `ToString: string` – debug: prints the subtree as text
+
+---
+
+### `TToonParser`
+
+Parses a TOON document from a string into a `TToonNode` tree:
+
+- `function Parse(const AToonContent: string): TToonNode;`
+
+Internally it:
+
+- splits content into lines,
+- calculates indentation depth,
+- builds a stack of parent nodes,
+- creates object/array/primitive nodes according to TOON rules.
+
+---
+
+## Basic Usage
 
 ```pascal
+uses
+  DToon;
 
-type
+procedure DemoToon;
+const
+  CToonSample =
+    'name: "Example"' + sLineBreak +
+    'version: 1'       + sLineBreak +
+    'enabled: true'    + sLineBreak +
+    'items[2]:'        + sLineBreak +
+    '  0: "foo"'       + sLineBreak +
+    '  1: "bar"';
+var
+  Parser: TToonParser;
+  Root: TToonNode;
+begin
+  Parser := TToonParser.Create;
+  try
+    Root := Parser.Parse(CToonSample);
 
-&nbsp; TToonNodeType = (tntObject, tntArray, tntString, tntNumber, tntBoolean, tntNull);
+    // Object fields
+    Writeln('Name: ',    Root.Pair['name'].AsString);
+    Writeln('Version: ', Root.Pair['version'].AsInteger);
+    Writeln('Enabled: ', BoolToStr(Root.Pair['enabled'].AsBoolean, True));
 
+    // Array items
+    Writeln('First item: ', Root.Pair['items'][0].AsString);
 
-
-&nbsp; TToonNode = class
-
-&nbsp; private
-
-&nbsp;   FNodeType: TToonNodeType;
-
-&nbsp;   FValue: string;
-
-&nbsp;   FChildren: TObjectList<TToonNode>;
-
-&nbsp;   FKey: string;
-
-&nbsp;   function GetItem(Index: Integer): TToonNode;
-
-&nbsp;   function GetCount: Integer;
-
-&nbsp;   function GetPair(const KeyName: string): TToonNode;
-
-&nbsp; public
-
-&nbsp;   constructor Create(ANodeType: TToonNodeType; const AKey: string = '');
-
-&nbsp;   destructor Destroy; override;
-
-
-
-&nbsp;   property NodeType: TToonNodeType read FNodeType;
-
-&nbsp;   property Key: string read FKey;
-
-&nbsp;   property Value: string read FValue write FValue;
-
-
-
-&nbsp;   /// Children for object/array nodes
-
-&nbsp;   property Children\[Index: Integer]: TToonNode read GetItem; default;
-
-&nbsp;   property Count: Integer read GetCount;
-
-
-
-&nbsp;   /// Access child node by key (for objects)
-
-&nbsp;   property Pair\[const KeyName: string]: TToonNode read GetPair;
-
-
-
-&nbsp;   // Helpers
-
-&nbsp;   function AddChild(AType: TToonNodeType; AKey: string = ''): TToonNode;
-
-&nbsp;   function AsString: string;
-
-&nbsp;   function AsInteger: Integer;
-
-&nbsp;   function AsBoolean: Boolean;
-
-
-
-&nbsp;   // Debug helper – prints the subtree as text
-
-&nbsp;   function ToString: string; override;
-
-&nbsp; end;
-
-
-
+    // Debug print
+    Writeln(Root.ToString);
+  finally
+    Parser.Free;
+  end;
+end;
