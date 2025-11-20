@@ -34,9 +34,9 @@ unit DToon;
 interface
 
 uses
-  System.SysUtils, 
-  System.Classes, 
-  System.Generics.Collections, 
+  System.SysUtils,
+  System.Classes,
+  System.Generics.Collections,
   System.RegularExpressions,
   System.StrUtils,
   System.Rtti;
@@ -48,8 +48,8 @@ type
   private
     FNodeType: TToonNodeType;
     FValue: string;
-    FChildren: TObjectList<TToonNode>;
-    FKey: string;
+		FChildren: TObjectList<TToonNode>;
+		FKey: string;
     FOwnsChildren: Boolean;
     function GetItem(Index: Integer): TToonNode;
     function GetCount: Integer;
@@ -57,21 +57,22 @@ type
   public
     constructor Create(AType: TToonNodeType; AKey: string = '');
     destructor Destroy; override;
-	
-	// Main properties
-    property NodeType: TToonNodeType read FNodeType;
+
+    // Main properties
+    property NodeType: TToonNodeType read FNodeType write FNodeType;
     property Value: string read FValue write FValue;
     property Key: string read FKey write FKey;
     property Items[Index: Integer]: TToonNode read GetItem; default;
     property Pair[const KeyName: string]: TToonNode read GetPair;
     property Count: Integer read GetCount;
-    
-	// Helpers
-    function AddChild(AType: TToonNodeType; AKey: string = ''): TToonNode;
-	function AsString: string;
+
+    // Helpers
+		function AddChild(AType: TToonNodeType; AKey: string = ''): TToonNode;
+    function FindChild(const AKey: string): TToonNode; // Helper for Dot Notation
+    function AsString: string;
     function AsInteger: Integer;
-    function AsBoolean: Boolean;    
-    
+    function AsBoolean: Boolean;
+
     // Debug: Print the tree as text.
     function ToString: string; override;
   end;
@@ -80,14 +81,14 @@ type
   private
     FLines: TStringList;
     FRoot: TToonNode;
-    
+
     function CalculateIndent(const Line: string): Integer;
     function ParseValue(const ValueStr: string): TToonNode;
+    function SmartSplitCSV(const Line: string; ExpectedCount: Integer): TArray<string>;
     procedure ProcessLines;
   public
     constructor Create;
     destructor Destroy; override;
-    
     function Parse(const AToonContent: string): TToonNode;
   end;
 
@@ -115,6 +116,17 @@ begin
   FChildren.Add(Result);
 end;
 
+function TToonNode.FindChild(const AKey: string): TToonNode;
+var
+	Node: TToonNode;
+begin
+  Result := nil;
+	for Node in FChildren do
+		//Use SameText for lookup robustness, but keys are stored case-sensitive
+    if SameText(Node.Key, AKey) then
+      Exit(Node);
+end;
+
 function TToonNode.GetItem(Index: Integer): TToonNode;
 begin
   Result := FChildren[Index];
@@ -126,13 +138,8 @@ begin
 end;
 
 function TToonNode.GetPair(const KeyName: string): TToonNode;
-var
-  Node: TToonNode;
 begin
-  Result := nil;
-  for Node in FChildren do
-    if SameText(Node.Key, KeyName) then
-      Exit(Node);
+  Result := FindChild(KeyName);
 end;
 
 function TToonNode.AsString: string;
@@ -191,14 +198,56 @@ begin
   end;
 end;
 
+// Robust CSV splitting (handles commas inside quotes)
+function TToonParser.SmartSplitCSV(const Line: string; ExpectedCount: Integer): TArray<string>;
+var
+  I, Len: Integer;
+  InQuote: Boolean;
+  CurrentToken: string;
+  Tokens: TList<string>;
+  C: Char;
+begin
+  Tokens := TList<string>.Create;
+  try
+    InQuote := False;
+    CurrentToken := '';
+    Len := Length(Line);
+
+    for I := 1 to Len do
+    begin
+      C := Line[I];
+      if C = '"' then
+        InQuote := not InQuote // Toggle quote state
+      else if (C = ',') and (not InQuote) then
+      begin
+				Tokens.Add(Trim(CurrentToken));
+        CurrentToken := '';
+      end
+      else
+        CurrentToken := CurrentToken + C;
+    end;
+    Tokens.Add(Trim(CurrentToken)); // Add last token
+
+    Result := Tokens.ToArray;
+  finally
+    Tokens.Free;
+  end;
+end;
+
 function TToonParser.ParseValue(const ValueStr: string): TToonNode;
 var
   LowerVal: string;
   iVal: Integer;
   dVal: Double;
+  CleanVal: string;
 begin
-  LowerVal := LowerCase(Trim(ValueStr));
-  
+	// Remove surrounding quotes if they exist
+	CleanVal := ValueStr;
+  if (Length(CleanVal) >= 2) and (CleanVal.StartsWith('"')) and (CleanVal.EndsWith('"')) then
+    CleanVal := Copy(CleanVal, 2, Length(CleanVal) - 2);
+
+  LowerVal := LowerCase(CleanVal);
+
   if LowerVal = 'null' then
     Result := TToonNode.Create(tntNull)
   else if (LowerVal = 'true') or (LowerVal = 'false') then
@@ -206,22 +255,23 @@ begin
     Result := TToonNode.Create(tntBoolean);
     Result.Value := LowerVal;
   end
-  else if TryStrToInt(Trim(ValueStr), iVal) or TryStrToFloat(Trim(ValueStr), dVal) then
+  else if TryStrToInt(CleanVal, iVal) or TryStrToFloat(CleanVal, dVal) then
   begin
     Result := TToonNode.Create(tntNumber);
-    Result.Value := Trim(ValueStr);
+    Result.Value := CleanVal;
   end
   else
   begin
     Result := TToonNode.Create(tntString);
-    Result.Value := Trim(ValueStr); // Remove quotes
+    Result.Value := CleanVal;
   end;
 end;
 
 function TToonParser.Parse(const AToonContent: string): TToonNode;
 begin
   FLines.Text := AToonContent;
-  FRoot := TToonNode.Create(tntObject, 'root');
+  // Default to object, but ProcessLines might morph it into an Array for Root Arrays
+	FRoot := TToonNode.Create(tntObject, 'root');
   try
     ProcessLines;
     Result := FRoot;
@@ -233,31 +283,29 @@ end;
 
 procedure TToonParser.ProcessLines;
 var
-  I, J, CurrIndent, LevelIndent, ArrayCount: Integer;
+	I, J, K, CurrIndent, ArrayCount: Integer;
   Line, TrimmedLine, KeyPart, HeadersPart, ValPart: string;
-  Stack: TList<TPair<Integer, TToonNode>>; // Stack (Indent, Node)
-  CurrentParent: TToonNode;
-  Headers: TArray<string>;
-  RowValues: TArray<string>;
-  ChildNode, ArrayNode, ObjNode: TToonNode;
+  Stack: TList<TPair<Integer, TToonNode>>;
+  CurrentParent, ChildNode, ArrayNode, ObjNode, PathNode: TToonNode;
+  Headers, RowValues, KeyPath: TArray<string>;
   RegexTabular: TRegEx;
   Match: TMatch;
+  SeparatorPos: Integer;
 begin
   Stack := TList<TPair<Integer, TToonNode>>.Create;
   try
     Stack.Add(TPair<Integer, TToonNode>.Create(-1, FRoot));
-
-	// Regex to capture tabular format: key[3]{col1,col2}:
-	// Group 1: Key, Group 2: Count, Group 3: Headers (optional)
-    RegexTabular := TRegEx.Create('^([\w\d_]+)\[(\d+)\](?:\{([^}]+)\})?:?');
+		//
+		// 1. Key is now optional/wildcard ([\w\d_\.]*) to support Root Arrays [N]
+    // 2. Key supports dots for flattening logic
+    RegexTabular := TRegEx.Create('^([\w\d_\.]*)\[(\d+)\](?:\{([^}]+)\})?:?');
 
     I := 0;
     while I < FLines.Count do
     begin
       Line := FLines[I];
       TrimmedLine := Trim(Line);
-      
-      // Ignore empty lines or comments (#)
+
       if (TrimmedLine = '') or (TrimmedLine.StartsWith('#')) then
       begin
         Inc(I);
@@ -266,75 +314,108 @@ begin
 
       CurrIndent := CalculateIndent(Line);
 
-      // Find the correct parent based on the indentation.
+      // Context Management
       while (Stack.Count > 1) and (Stack.Last.Key >= CurrIndent) do
         Stack.Delete(Stack.Count - 1);
-      
       CurrentParent := Stack.Last.Value;
 
-      // Checks if it is a Tabular/Structured Array (Ex: users[2]{id,name}:)
-      Match := RegexTabular.Match(TrimmedLine);
-      if Match.Success then
-      begin
-        KeyPart := Match.Groups[1].Value;
-        ArrayCount := StrToIntDef(Match.Groups[2].Value, 0);
-        HeadersPart := Match.Groups[3].Value; // Pode ser vazio
+      // ---------------------------------------------------------
+			// Tabular Array (e.g., users[2]... OR [2]...)
+			// ---------------------------------------------------------
+			Match := RegexTabular.Match(TrimmedLine);
+			if Match.Success then
+			begin
+				KeyPart := Match.Groups[1].Value;
+				ArrayCount := StrToIntDef(Match.Groups[2].Value, 0);
+				HeadersPart := Match.Groups[3].Value;
 
-        // Creates array node
-        ArrayNode := CurrentParent.AddChild(tntArray, KeyPart);
-        
-        // If there are headers, we read the next N lines as CSV.
-        if HeadersPart <> '' then
-        begin
-           Headers := HeadersPart.Split([',']);
-           // Consume the next 'ArrayCount' rows.
-           for J := 1 to ArrayCount do
-           begin
-             Inc(I);
-             if I >= FLines.Count then Break;
-             
-             RowValues := Trim(FLines[I]).Split([','], Length(Headers)); // Split simples
-             
-             // One object per line
-             ObjNode := ArrayNode.AddChild(tntObject);
-             
-             // Map headers to values
-             var K: Integer;
-             for K := 0 to High(Headers) do
-             begin
-               if K <= High(RowValues) then
-               begin
-                 ChildNode := ParseValue(RowValues[K]);
-                 ChildNode.Key := Headers[K];
-                 // Add a manual so you don't have to create another wrapper.
-                 ObjNode.FChildren.Add(ChildNode); 
-               end;
-             end;
-           end;
-        end;
-        // If there are no headers, it would be a simple list (not fully implemented here).
-      end
-      else if TrimmedLine.Contains(':') then
-      begin
-		// Standard Format: Key: Value
-		// Note: full implementation needs to handle ':' within strings
-        var SeparatorPos := Pos(':', TrimmedLine);
-        KeyPart := Copy(TrimmedLine, 1, SeparatorPos - 1);
-        ValPart := Copy(TrimmedLine, SeparatorPos + 1, MaxInt);
+				// Handle Root Array (Empty Key)
+				if KeyPart = '' then
+				begin
+					 // Convert the Root Object to an Array type conceptually
+					 // (Or just append to it if we treat Root as the container)
+					 FRoot.NodeType := tntArray;
+					 ArrayNode := FRoot;
+				end
+				else
+				begin
+					// Handle Dot Notation for Array Keys (e.g., data.users[2])
+					KeyPath := KeyPart.Split(['.']);
+					for K := 0 to High(KeyPath) - 1 do
+					begin
+						 PathNode := CurrentParent.FindChild(KeyPath[K]);
+						 if PathNode = nil then
+							 PathNode := CurrentParent.AddChild(tntObject, KeyPath[K]);
+						 CurrentParent := PathNode;
+					end;
+					// Create the actual array
+					ArrayNode := CurrentParent.AddChild(tntArray, KeyPath[High(KeyPath)]);
+				end;
 
-        if Trim(ValPart) = '' then
-        begin
-          // It's a nested object (the value is in the next indented lines)
-          ChildNode := CurrentParent.AddChild(tntObject, Trim(KeyPart));
-          Stack.Add(TPair<Integer, TToonNode>.Create(CurrIndent, ChildNode));
-        end
-        else
-        begin
-          // Scalar value (String, Number, etc)
-          ChildNode := ParseValue(ValPart);
-          ChildNode.Key := Trim(KeyPart);
-          CurrentParent.FChildren.Add(ChildNode);
-        end;
+				if HeadersPart <> '' then
+				begin
+					 Headers := HeadersPart.Split([',']);
+
+					 for K := 0 to High(Headers) do
+						 Headers[K] := Trim(Headers[K]);
+
+					 for J := 1 to ArrayCount do
+					 begin
+						 Inc(I);
+						 if I >= FLines.Count then Break;
+
+						 // Use SmartSplitCSV instead of simple Split
+						 RowValues := SmartSplitCSV(Trim(FLines[I]), Length(Headers));
+
+						 ObjNode := ArrayNode.AddChild(tntObject);
+						 for K := 0 to High(Headers) do
+						 begin
+							 if K <= High(RowValues) then
+							 begin
+								 ChildNode := ParseValue(RowValues[K]);
+								 // Preserve Header Case
+								 ChildNode.Key := Headers[K];
+								 ObjNode.FChildren.Add(ChildNode);
+							 end;
+						 end;
+					 end;
+				end;
+			end
+			// ---------------------------------------------------------
+			// Standard Key: Value (with Path Compression)
+			// ---------------------------------------------------------
+			else if TrimmedLine.Contains(':') then
+			begin
+				SeparatorPos := Pos(':', TrimmedLine);
+				KeyPart := Trim(Copy(TrimmedLine, 1, SeparatorPos - 1));
+				ValPart := Trim(Copy(TrimmedLine, SeparatorPos + 1, MaxInt));
+
+				// Dot Notation Flattening
+				KeyPath := KeyPart.Split(['.']);
+
+				for K := 0 to High(KeyPath) - 1 do
+				begin
+					PathNode := CurrentParent.FindChild(KeyPath[K]);
+					if PathNode = nil then
+						PathNode := CurrentParent.AddChild(tntObject, KeyPath[K]);
+					CurrentParent := PathNode;
+				end;
+
+				KeyPart := KeyPath[High(KeyPath)];
+
+				if ValPart = '' then
+				begin
+					// Nested Object Start
+					ChildNode := CurrentParent.AddChild(tntObject, KeyPart);
+					Stack.Add(TPair<Integer, TToonNode>.Create(CurrIndent, ChildNode));
+				end
+				else
+				begin
+					// Scalar Value
+					ChildNode := ParseValue(ValPart);
+					ChildNode.Key := KeyPart; // Preserves Key Case
+					CurrentParent.FChildren.Add(ChildNode);
+				end;
       end;
 
       Inc(I);

@@ -34,6 +34,157 @@ TOON models data the same way as JSON:
 
 ---
 
+##
+Standard TOON (like YAML) excels at readability but suffers with arrays of objects. Repeating keys and indentation for every item wastes tokens.
+Uniform arrays are converted into a tabular format supported TToonParser. This separates schema from data, drastically reducing overhead.
+
+Json:
+```json
+{
+  "meta": {
+    "version": "1.0",
+    "generated": "2023-10-27"
+  },
+  "users": [
+    {
+      "id": 101,
+      "name": "Alice Johnson",
+      "role": "Admin",
+      "active": true,
+      "login_count": 42
+    },
+    {
+      "id": 102,
+      "name": "Bob Smith",
+      "role": "Editor",
+      "active": true,
+      "login_count": 15
+    },
+    {
+      "id": 103,
+      "name": "Charlie Brown",
+      "role": "Viewer",
+      "active": false,
+      "login_count": 3
+    },
+    {
+      "id": 104,
+      "name": "Diana Prince",
+      "role": "Admin",
+      "active": true,
+      "login_count": 128
+    },
+    {
+      "id": 105,
+      "name": "Evan Wright",
+      "role": "Viewer",
+      "active": true,
+      "login_count": 0
+    }
+  ],
+  "inventory": [
+    {
+      "sku": "WID-001",
+      "desc": "Widget A",
+      "stock": 500,
+      "price": 19.99
+    },
+    {
+      "sku": "WID-002",
+      "desc": "Widget B",
+      "stock": 0,
+      "price": 25.5
+    },
+    {
+      "sku": "GAD-001",
+      "desc": "Gadget X",
+      "stock": 120,
+      "price": 99
+    }
+  ]
+}
+```
+
+Standard TOON (Nested)
+```
+meta:
+  version: 1.0
+  generated: 2023-10-27
+users:
+  item_0:
+    id: 101
+    name: Alice Johnson
+    role: Admin
+    active: true
+    login_count: 42
+  item_1:
+    id: 102
+    name: Bob Smith
+    role: Editor
+    active: true
+    login_count: 15
+  item_2:
+    id: 103
+    name: Charlie Brown
+    role: Viewer
+    active: false
+    login_count: 3
+  item_3:
+    id: 104
+    name: Diana Prince
+    role: Admin
+    active: true
+    login_count: 128
+  item_4:
+    id: 105
+    name: Evan Wright
+    role: Viewer
+    active: true
+    login_count: 0
+inventory:
+  item_0:
+    sku: WID-001
+    desc: Widget A
+    stock: 500
+    price: 19.99
+  item_1:
+    sku: WID-002
+    desc: Widget B
+    stock: 0
+    price: 25.5
+  item_2:
+    sku: GAD-001
+    desc: Gadget X
+    stock: 120
+    price: 99
+```
+
+Optimized TOON (Flat)
+```
+meta:
+  version: 1.0
+  generated: 2023-10-27
+users[5]{id,name,role,active,login_count}:
+  101,Alice Johnson,Admin,true,42
+  102,Bob Smith,Editor,true,15
+  103,Charlie Brown,Viewer,false,3
+  104,Diana Prince,Admin,true,128
+  105,Evan Wright,Viewer,true,0
+inventory[3]{sku,desc,stock,price}:
+  WID-001,Widget A,500,19.99
+  WID-002,Widget B,0,25.5
+  GAD-001,Gadget X,120,99
+```
+
+| Token Usage Analysis   |  Usage                |
+|------------------------|----------------------:|
+| JSON                   | 100%  ██████████████  |
+| Standard TOON (Nested) |  74%  ██████████░░░░  |
+| Optimized TOON (Flat)  |  35%  █████░░░░░░░░░  |
+* Based on character count approximation (1 token ≈ 4 chars). Actual LLM tokenization may vary slightly.
+
+---
+
 ## Root Forms
 
 A TOON document can represent different root forms:
